@@ -89,6 +89,7 @@ binaries = []
 binaries_conf = config.get('**/loader/binaries')
 if binaries_conf is not None:
     binaries = binaries_conf.get_dict()
+binaries = args.binaries + binaries
 
 bridge = db.rt_bridge(config=config, verbose=args.verbose, binaries=binaries)
 
