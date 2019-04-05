@@ -96,6 +96,8 @@ private:
   int flash_erase_chip(int32_t type, uint32_t itf, uint32_t cs);
   void buffer_free(uint32_t addr, uint32_t size);
   uint32_t buffer_alloc(uint32_t size);
+  void recv(int sockfd, void *buf, size_t len, int flags);
+  void send(int sockfd, void *buf, size_t len, int flags);
 
   int m_socket;
   unsigned int debug_struct_addr;
@@ -137,11 +139,11 @@ bool Reqloop::access(bool write, unsigned int addr, int size, char* buffer)
   this->pending_req = true;
   this->pending_buffer = buffer;
 
-  ::send(this->m_socket, (void *)&req, sizeof(req), 0);
+  this->send(this->m_socket, (void *)&req, sizeof(req), 0);
 
   if (write)
   {
-    ::send(this->m_socket, (void *)buffer, size, 0);
+    this->send(this->m_socket, (void *)buffer, size, 0);
   }
 
   while(this->pending_req)
@@ -157,6 +159,37 @@ bool Reqloop::access(bool write, unsigned int addr, int size, char* buffer)
 }
 
 
+void Reqloop::recv(int sockfd, void *buf, size_t len, int flags)
+{
+  while (len > 0)
+  {
+    int err = ::recv(sockfd, buf, len, flags);
+    if (err == -1 && errno != EAGAIN)
+      exit(0);
+
+    if (err > 0)
+    {
+      len -= err;
+      buf = ((char *)buf) + err;
+    }
+  }
+}
+
+void Reqloop::send(int sockfd, void *buf, size_t len, int flags)
+{
+  while (len > 0)
+  {
+    int err = ::send(sockfd, buf, len, flags);
+    if (err == -1 && errno != EAGAIN)
+      exit(0);
+
+    if (err > 0)
+    {
+      len -= err;
+      buf = ((char *)buf) + err;
+    }
+  }
+}
 
 void Reqloop::listener_routine()
 {
@@ -164,15 +197,14 @@ void Reqloop::listener_routine()
   {
     reqserver_rsp_payload_t rsp;
 
-    if (::recv(this->m_socket, (void *)&rsp.rsp, sizeof(rsp.rsp), 0) != sizeof(rsp.rsp)) goto end;
+    this->recv(this->m_socket, (void *)&rsp.rsp, sizeof(rsp.rsp), 0);
 
     if (rsp.rsp.type == REQSERVER_READMEM_RSP || rsp.rsp.type == REQSERVER_WRITEMEM_RSP|| rsp.rsp.type == REQSERVER_ERROR_RSP)
     {
       if (rsp.rsp.type == REQSERVER_READMEM_RSP)
       {
-        if (::recv(this->m_socket, (void *)&rsp.len, sizeof(rsp.len), 0) != sizeof(rsp.len)) goto end;
-
-        if (::recv(this->m_socket, (void *)this->pending_buffer, rsp.len, 0) != rsp.len) goto end;
+        this->recv(this->m_socket, (void *)&rsp.len, sizeof(rsp.len), 0);
+        this->recv(this->m_socket, (void *)this->pending_buffer, rsp.len, 0);
       }
 
       this->mutex.lock();
@@ -192,9 +224,6 @@ void Reqloop::listener_routine()
 
 
   }
-
-end:
-  printf("Got access error in reqloop\n");
 }
 
 
@@ -311,7 +340,7 @@ void Reqloop::reqloop_routine()
   {
     this->access(false, debug_struct_addr, 4, (char*)&this->debug_struct);
 
-    printf("GOT DEBUG STRUCT %x\n", this->debug_struct);
+    //printf("GOT DEBUG STRUCT %x\n", this->debug_struct);
 
     while(!this->end)
     {
