@@ -164,7 +164,8 @@ void Reqloop::recv(int sockfd, void *buf, size_t len, int flags)
   while (len > 0)
   {
     int err = ::recv(sockfd, buf, len, flags);
-    if (err == -1 && errno != EAGAIN)
+
+    if (err == 0 || (err == -1 && errno != EAGAIN))
       exit(0);
 
     if (err > 0)
@@ -180,7 +181,7 @@ void Reqloop::send(int sockfd, void *buf, size_t len, int flags)
   while (len > 0)
   {
     int err = ::send(sockfd, buf, len, flags);
-    if (err == -1 && errno != EAGAIN)
+    if (err == 0 || (err == -1 && errno != EAGAIN))
       exit(0);
 
     if (err > 0)
