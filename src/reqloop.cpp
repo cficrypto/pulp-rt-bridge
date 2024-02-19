@@ -18,6 +18,7 @@
  * Authors: Germain Haugou, ETH (germain.haugou@iis.ee.ethz.ch)
  */
 
+#include <stdexcept>
 #include <stdio.h>
 #include <thread>
 #include "debug_bridge/debug_bridge.h"
